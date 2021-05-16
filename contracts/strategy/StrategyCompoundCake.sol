@@ -2,28 +2,25 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/BEP20.sol";
 import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/SafeBEP20.sol";
 import "@pancakeswap/pancake-swap-lib/contracts/access/Ownable.sol";
 
-import "./interfaces/IStrategy.sol";
-import "./interfaces/IMasterChef.sol";
+import "./interfaces/ICakeMasterChef.sol";
 import "./shark/ISharkMinter.sol";
 import "./interfaces/IStrategyHelper.sol";
-import "./interfaces/IPantherToken.sol";
+import "./interfaces/IStrategy.sol";
 import "./shark/ISharkReferral.sol";
 
-contract StrategyCompoundPantherV2 is IStrategy, Ownable {
+contract StrategyCompoundCake is IStrategy, Ownable {
     using SafeBEP20 for IBEP20;
-    using SafeBEP20 for IPantherToken;
     using SafeMath for uint256;
 
-    IPantherToken private constant PANTHER = IPantherToken(0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7); // PANTHER
-    IMasterChef private constant PANTHER_MASTER_CHEF = IMasterChef(0x058451C62B96c594aD984370eDA8B6FD7197bbd4); // PANTHER CHEF
+    IBEP20 private constant CAKE = IBEP20(0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82);
+    ICakeMasterChef private constant CAKE_MASTER_CHEF = ICakeMasterChef(0x73feaa1eE314F8c655E354234017bE2193C9E24E);
 
     address public keeper = 0xB4697cCDC82712d12616c7738F162ceC9DCEC4E8;
 
-    uint public poolId = 9;
+    uint public constant poolId = 0;
 
     uint public totalShares;
     mapping (address => uint) private _shares;
@@ -31,7 +28,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     mapping (address => uint) public depositedAt;
 
     ISharkMinter public minter;
-    IStrategyHelper public helper = IStrategyHelper(0xd9bAfd0024d931D103289721De0D43077e7c2B49);
+    IStrategyHelper public helper = IStrategyHelper(0x3027a3A0977db985e812D2D4FDd0a17aF17C8ef4); // CAKE strategy
     
     // Shark referral contract address
     ISharkReferral public sharkReferral;
@@ -39,15 +36,13 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     uint16 public referralCommissionRate = 1000;
     // Max referral commission rate: 10%.
     uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
-    // Added SHARK minting boost rate: 150%
-    uint16 public boostRate = 50000;
+    // Added SHARK minting boost rate: 300%
+    uint16 public boostRate = 30000;
     
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);
 
     constructor() public {
-        PANTHER.safeApprove(address(PANTHER_MASTER_CHEF), uint(~0));
-
-        setMinter(ISharkMinter(0x4188E681167BE0C5d45B4d839E78C632Ee41584d));
+        CAKE.safeApprove(address(CAKE_MASTER_CHEF), uint(~0));
     }
 
     function setKeeper(address _keeper) external {
@@ -56,17 +51,13 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
         keeper = _keeper;
     }
 
-    function setMinter(ISharkMinter _minter) public onlyOwner {
+    function setMinter(ISharkMinter _minter) external onlyOwner {
         // can zero
         minter = _minter;
         if (address(_minter) != address(0)) {
-            PANTHER.safeApprove(address(_minter), 0);
-            PANTHER.safeApprove(address(_minter), uint(~0));
+            CAKE.safeApprove(address(_minter), 0);
+            CAKE.safeApprove(address(_minter), uint(~0));
         }
-    }
-    
-     function setPoolId(uint _poolId) public onlyOwner {
-        poolId = _poolId;
     }
 
     function setHelper(IStrategyHelper _helper) external {
@@ -75,15 +66,15 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
 
         helper = _helper;
     }
-    
+
     function setBoostRate(uint16 _boostRate) override public onlyOwner {
         require(_boostRate >= 10000, 'boost rate must be minimally 100%');
         boostRate = _boostRate;
     }
 
     function balance() override public view returns (uint) {
-        (uint amount,) = PANTHER_MASTER_CHEF.userInfo(poolId, address(this));
-        return PANTHER.balanceOf(address(this)).add(amount);
+        (uint amount,) = CAKE_MASTER_CHEF.userInfo(poolId, address(this));
+        return CAKE.balanceOf(address(this)).add(amount);
     }
 
     function balanceOf(address account) override public view returns(uint) {
@@ -111,11 +102,11 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
             return (0, 0, 0);
         }
 
-        return helper.profitOf(minter, address(PANTHER), _balance.sub(principal));
+        return helper.profitOf(minter, address(CAKE), _balance.sub(principal));
     }
 
     function tvl() override public view returns (uint) {
-        return helper.tvl(address(PANTHER), balance());
+        return helper.tvl(address(CAKE), balance());
     }
 
     function apy() override public view returns(uint _usd, uint _shark, uint _bnb) {
@@ -148,26 +139,21 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
         return userInfo;
     }
 
-    function priceShare() external view returns(uint) {
-        if (totalShares == 0) return 1e18;
+    function priceShare() public view returns(uint) {
         return balance().mul(1e18).div(totalShares);
     }
 
     function _depositTo(uint _amount, address _to, address _referrer) private {
         uint _pool = balance();
-        PANTHER.safeTransferFrom(msg.sender, address(this), _amount);
+        CAKE.safeTransferFrom(msg.sender, address(this), _amount);
         uint shares = 0;
-        uint firstTax = _amount.mul(PANTHER.transferTaxRate()).div(10000);
-        uint secondTax = _amount.sub(firstTax).mul(PANTHER.transferTaxRate()).div(10000);
-        uint transferTax = firstTax.add(secondTax);
         if (totalShares == 0) {
-            shares = _amount.sub(transferTax);
+            shares = _amount;
         } else {
-            uint sharesAfterTax = _amount.sub(transferTax);
-            shares = (sharesAfterTax.mul(totalShares)).div(_pool);
+            shares = (_amount.mul(totalShares)).div(_pool);
         }
-        
-        // shares are also the same as amount, after it has been taxed
+
+        // shares are also the same as amount
         if (shares > 0 && address(sharkReferral) != address(0) && _referrer != address(0) && _referrer != msg.sender) {
             sharkReferral.recordReferral(msg.sender, _referrer);
         }
@@ -177,7 +163,8 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
         _principal[_to] = _principal[_to].add(_amount);
         depositedAt[_to] = block.timestamp;
 
-        harvest();
+        uint balanceOfCake = CAKE.balanceOf(address(this));
+        CAKE_MASTER_CHEF.enterStaking(balanceOfCake);
     }
 
     function deposit(uint _amount, address _referrer) override public {
@@ -185,7 +172,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     }
 
     function depositAll(address referrer) override external {
-        deposit(PANTHER.balanceOf(msg.sender), referrer);
+        deposit(CAKE.balanceOf(msg.sender), referrer);
     }
 
     function withdrawAll() override external {
@@ -193,51 +180,40 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
 
         totalShares = totalShares.sub(_shares[msg.sender]);
         delete _shares[msg.sender];
-
-        uint pantherBalance = PANTHER.balanceOf(address(this));
-
-        if (_withdraw > pantherBalance) {
-            PANTHER_MASTER_CHEF.withdraw(poolId, _withdraw.sub(pantherBalance));
-        }
+        CAKE_MASTER_CHEF.leaveStaking(_withdraw.sub(CAKE.balanceOf(address(this))));
 
         uint principal = _principal[msg.sender];
         uint depositTimestamp = depositedAt[msg.sender];
-        uint firstTax = _withdraw.mul(PANTHER.transferTaxRate()).div(10000);
-        uint secondTax = _withdraw.sub(firstTax).mul(PANTHER.transferTaxRate()).div(10000);
-        uint transferTax = firstTax.add(secondTax);
-        uint withdrawAfterTax = _withdraw.sub(transferTax);
-
         delete _principal[msg.sender];
         delete depositedAt[msg.sender];
 
-        if (address(minter) != address(0) && minter.isMinter(address(this)) && withdrawAfterTax > principal) {
-            uint profit = withdrawAfterTax.sub(principal);
-            uint withdrawalFee = minter.withdrawalFee(withdrawAfterTax, depositTimestamp);
+        if (address(minter) != address(0) && minter.isMinter(address(this)) && _withdraw > principal) {
+            uint profit = _withdraw.sub(principal);
+            uint withdrawalFee = minter.withdrawalFee(_withdraw, depositTimestamp);
             uint performanceFee = minter.performanceFee(profit);
 
-            uint mintedShark = minter.mintFor(address(PANTHER), withdrawalFee, performanceFee, msg.sender, depositTimestamp, boostRate);
-            payReferralCommission(msg.sender, mintedShark);
+            minter.mintFor(address(CAKE), withdrawalFee, performanceFee, msg.sender, depositTimestamp, boostRate);
 
-            PANTHER.safeTransfer(msg.sender, withdrawAfterTax.sub(withdrawalFee).sub(performanceFee));
+            CAKE.safeTransfer(msg.sender, _withdraw.sub(withdrawalFee).sub(performanceFee));
         } else {
-            PANTHER.safeTransfer(msg.sender, withdrawAfterTax);
+            CAKE.safeTransfer(msg.sender, _withdraw);
         }
 
-        harvest();
+        CAKE_MASTER_CHEF.enterStaking(CAKE.balanceOf(address(this)));
     }
 
-    // We dont need to check if we can harvest cos PANTHER chef will check for us
-    // If there's funds, in our wallet, we want to put it to work immediately
-    function harvest() override public {
-        PANTHER_MASTER_CHEF.withdraw(poolId, 0);
-        uint pantherAmount = PANTHER.balanceOf(address(this));
-        PANTHER_MASTER_CHEF.deposit(poolId, pantherAmount, 0xD9ebB6d95f3D8f3Da0b922bB05E0E79501C13554);
+    function harvest() override external {
+        require(msg.sender == keeper || msg.sender == owner(), 'auth');
+
+        CAKE_MASTER_CHEF.leaveStaking(0);
+        uint cakeAmount = CAKE.balanceOf(address(this));
+        CAKE_MASTER_CHEF.enterStaking(cakeAmount);
     }
 
     // salvage purpose only
     function withdrawToken(address token, uint amount) external {
         require(msg.sender == keeper || msg.sender == owner(), 'auth');
-        require(token != address(PANTHER));
+        require(token != address(CAKE));
 
         IBEP20(token).safeTransfer(msg.sender, amount);
     }
@@ -249,9 +225,8 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     function getReward() override external {
         revert("Use withdrawAll");
     }
-    
-    
-    /**
+
+     /**
      * Referral code
      */
     
