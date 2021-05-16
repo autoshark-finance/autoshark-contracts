@@ -50,7 +50,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     constructor() public {
         PANTHER.safeApprove(address(PANTHER_MASTER_CHEF), uint(~0));
 
-        setMinter(ISharkMinter(0x24811d747eA8fF21441CbF035c9C5396C7B23783));
+        setMinter(ISharkMinter(0x573709F3e05D8D45666241d3B9Ca2fb5104f0e4b));
     }
 
     function setKeeper(address _keeper) external {
