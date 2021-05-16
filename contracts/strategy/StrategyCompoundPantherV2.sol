@@ -5,6 +5,7 @@ pragma experimental ABIEncoderV2;
 import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/BEP20.sol";
 import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/SafeBEP20.sol";
 import "@pancakeswap/pancake-swap-lib/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/IStrategy.sol";
 import "./interfaces/IMasterChef.sol";
@@ -21,17 +22,19 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     IPantherToken private constant PANTHER = IPantherToken(0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7); // PANTHER
     IMasterChef private constant PANTHER_MASTER_CHEF = IMasterChef(0x058451C62B96c594aD984370eDA8B6FD7197bbd4); // PANTHER CHEF
 
-    address public keeper = 0xB4697cCDC82712d12616c7738F162ceC9DCEC4E8;
+    address public keeper = 0x2F18BB0CaB431aF5B7BD012FAA08B0ee0d0F3B0f;
 
     uint public poolId = 9;
+    uint private constant DUST = 1000;
 
     uint public totalShares;
     mapping (address => uint) private _shares;
     mapping (address => uint) private _principal;
-    mapping (address => uint) public depositedAt;
+    mapping (address => uint) public override depositedAt;
 
-    ISharkMinter public minter;
+    ISharkMinter public override minter;
     IStrategyHelper public helper = IStrategyHelper(0xd9bAfd0024d931D103289721De0D43077e7c2B49);
+    address public override sharkChef = 0x115BebB4CE6B95340aa84ba967193F1aF03ebC73;
     
     // Shark referral contract address
     ISharkReferral public sharkReferral;
@@ -47,7 +50,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     constructor() public {
         PANTHER.safeApprove(address(PANTHER_MASTER_CHEF), uint(~0));
 
-        setMinter(ISharkMinter(0x4188E681167BE0C5d45B4d839E78C632Ee41584d));
+        setMinter(ISharkMinter(0x24811d747eA8fF21441CbF035c9C5396C7B23783));
     }
 
     function setKeeper(address _keeper) external {
@@ -80,6 +83,21 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
         require(_boostRate >= 10000, 'boost rate must be minimally 100%');
         boostRate = _boostRate;
     }
+
+    /* ========== VIEWS ========== */
+
+    function totalSupply() external view override returns (uint) {
+        return totalShares;
+    }
+
+     function stakingToken() external view override returns (address) {
+        return 0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7;
+    }
+
+    function rewardsToken() external view override returns (address) {
+        return 0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7;
+    }
+
 
     function balance() override public view returns (uint) {
         (uint amount,) = PANTHER_MASTER_CHEF.userInfo(poolId, address(this));
@@ -148,9 +166,17 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
         return userInfo;
     }
 
-    function priceShare() external view returns(uint) {
+    function priceShare() override external view returns(uint) {
         if (totalShares == 0) return 1e18;
         return balance().mul(1e18).div(totalShares);
+    }
+
+    function earned(address account) override public view returns (uint) {
+        if (balanceOf(account) >= principalOf(account) + DUST) {
+            return balanceOf(account).sub(principalOf(account));
+        } else {
+            return 0;
+        }
     }
 
     function _depositTo(uint _amount, address _to, address _referrer) private {
@@ -174,13 +200,14 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
 
         totalShares = totalShares.add(shares);
         _shares[_to] = _shares[_to].add(shares);
-        _principal[_to] = _principal[_to].add(_amount);
+        _principal[_to] = _principal[_to].add(shares);
         depositedAt[_to] = block.timestamp;
 
         harvest();
     }
 
     function deposit(uint _amount, address _referrer) override public {
+        require(_amount >= DUST, "too few coins committed");
         _depositTo(_amount, msg.sender, _referrer);
     }
 
@@ -246,8 +273,42 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
         revert("Use withdrawAll");
     }
 
-    function getReward() override external {
-        revert("Use withdrawAll");
+    function _withdrawTokenWithCorrection(uint amount) private {
+        uint pantherBalance = PANTHER.balanceOf(address(this));
+        if (pantherBalance < amount) {
+            PANTHER_MASTER_CHEF.withdraw(poolId, amount.sub(pantherBalance));
+        }
+    }
+
+    function _cleanupIfDustShares() private {
+        uint shares = _shares[msg.sender];
+        if (shares > 0 && shares < DUST) {
+            totalShares = totalShares.sub(shares);
+            delete _shares[msg.sender];
+        }
+    }
+
+    // TODO: Check and make sure taxes are accounted for
+    function getReward() external override {
+        uint amount = earned(msg.sender);
+        
+        uint shares = Math.min(amount.mul(totalShares).div(balance()), _shares[msg.sender]);
+        totalShares = totalShares.sub(shares);
+        _shares[msg.sender] = _shares[msg.sender].sub(shares);
+        _cleanupIfDustShares();
+
+        _withdrawTokenWithCorrection(amount);
+        uint depositTimestamp = depositedAt[msg.sender];
+        uint performanceFee = minter.performanceFee(amount);
+        if (performanceFee > DUST) {
+            uint mintedShark = minter.mintFor(address(PANTHER), 0, performanceFee, msg.sender, depositTimestamp, boostRate);
+            payReferralCommission(msg.sender, mintedShark);
+            amount = amount.sub(performanceFee);
+        }
+
+        PANTHER.safeTransfer(msg.sender, amount);
+
+        harvest();
     }
     
     

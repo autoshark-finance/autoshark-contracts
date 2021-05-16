@@ -26,7 +26,7 @@ contract SharkChef is ISharkChef, OwnableUpgradeable {
 
     /* ========== CONSTANTS ============= */
 
-    SharkToken public constant SHARK = SharkToken(0xf7321385a461C4490d5526D83E63c366b149cB15); // TODO: Change to shark token
+    SharkToken public constant SHARK = SharkToken(0xf7321385a461C4490d5526D83E63c366b149cB15);
 
     /* ========== STATE VARIABLES ========== */
 

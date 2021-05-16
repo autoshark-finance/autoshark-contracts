@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 import "../../library/PoolConstant.sol";
 import "./IVaultController.sol";
 
-interface IStrategy is IVaultController {
+interface IStrategyV2 is IVaultController {
     function deposit(uint _amount) external;
     function depositAll() external;
     function withdraw(uint _amount) external;    // SHARK STAKING POOL ONLY

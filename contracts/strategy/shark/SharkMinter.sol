@@ -15,20 +15,20 @@ contract SharkMinter is ISharkMinter, Ownable, PantherSwap {
     using SafeMath for uint;
     using SafeBEP20 for IBEP20;
 
-    BEP20 private constant shark = BEP20(0x33d11961d3dBdE40A8c295Ff0549d244b9ef58b7); // SHARK
-    address public constant dev = 0xB4697cCDC82712d12616c7738F162ceC9DCEC4E8;
+    BEP20 private constant shark = BEP20(0xf7321385a461C4490d5526D83E63c366b149cB15); // SHARK
+    address public constant dev = 0xD9ebB6d95f3D8f3Da0b922bB05E0E79501C13554;
     IBEP20 private constant WBNB = IBEP20(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
 
-    uint public WITHDRAWAL_FEE_FREE_PERIOD = 3 days;
-    uint public WITHDRAWAL_FEE = 50;
+    uint public override WITHDRAWAL_FEE_FREE_PERIOD = 3 days;
+    uint public override WITHDRAWAL_FEE = 50;
     uint public constant FEE_MAX = 10000;
 
     uint public PERFORMANCE_FEE = 3000; // 30%
 
-    uint public sharkPerProfitBNB;
+    uint public override sharkPerProfitBNB;
     uint public sharkPerSharkBNBFlip;
 
-    address public constant sharkPool = 0x20E571543C825def7ffcEAa354D5BC7727A62602;
+    address public constant sharkPool = 0x5F7de53f6dF023d1c64046e9C4A2b8a1a0EC95C6;
     IStrategyHelper public helper = IStrategyHelper(0xd9bAfd0024d931D103289721De0D43077e7c2B49);
 
     mapping (address => bool) private _minters;

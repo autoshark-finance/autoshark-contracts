@@ -4,6 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/SafeBEP20.sol";
 import "@pancakeswap/pancake-swap-lib/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/ICakeMasterChef.sol";
 import "./shark/ISharkMinter.sol";
@@ -21,6 +22,7 @@ contract StrategyCompoundCake is IStrategy, Ownable {
     address public keeper = 0xB4697cCDC82712d12616c7738F162ceC9DCEC4E8;
 
     uint public constant poolId = 0;
+    uint private constant DUST = 1000;
 
     uint public totalShares;
     mapping (address => uint) private _shares;
@@ -72,6 +74,12 @@ contract StrategyCompoundCake is IStrategy, Ownable {
         boostRate = _boostRate;
     }
 
+     /* ========== VIEWS ========== */
+
+    function totalSupply() external view override returns (uint) {
+        return totalShares;
+    }
+
     function balance() override public view returns (uint) {
         (uint amount,) = CAKE_MASTER_CHEF.userInfo(poolId, address(this));
         return CAKE.balanceOf(address(this)).add(amount);
@@ -92,6 +100,14 @@ contract StrategyCompoundCake is IStrategy, Ownable {
 
     function principalOf(address account) override public view returns (uint) {
         return _principal[account];
+    }
+
+    function earned(address account) public view returns (uint) {
+        if (balanceOf(account) >= principalOf(account) + DUST) {
+            return balanceOf(account).sub(principalOf(account));
+        } else {
+            return 0;
+        }
     }
 
     function profitOf(address account) override public view returns (uint _usd, uint _shark, uint _bnb) {
@@ -202,13 +218,14 @@ contract StrategyCompoundCake is IStrategy, Ownable {
         CAKE_MASTER_CHEF.enterStaking(CAKE.balanceOf(address(this)));
     }
 
-    function harvest() override external {
+    function harvest() override public {
         require(msg.sender == keeper || msg.sender == owner(), 'auth');
 
         CAKE_MASTER_CHEF.leaveStaking(0);
         uint cakeAmount = CAKE.balanceOf(address(this));
         CAKE_MASTER_CHEF.enterStaking(cakeAmount);
     }
+    
 
     // salvage purpose only
     function withdrawToken(address token, uint amount) external {
@@ -222,8 +239,39 @@ contract StrategyCompoundCake is IStrategy, Ownable {
         revert("Use withdrawAll");
     }
 
-    function getReward() override external {
-        revert("Use withdrawAll");
+     function _withdrawTokenWithCorrection(uint amount) private {
+        uint cakeBalance = CAKE.balanceOf(address(this));
+        if (cakeBalance < amount) {
+            CAKE_MASTER_CHEF.withdraw(poolId, amount.sub(cakeBalance));
+        }
+    }
+
+    function _cleanupIfDustShares() private {
+        uint shares = _shares[msg.sender];
+        if (shares > 0 && shares < DUST) {
+            totalShares = totalShares.sub(shares);
+            delete _shares[msg.sender];
+        }
+    }
+
+    function getReward() external override {
+        uint amount = earned(msg.sender);
+        uint shares = Math.min(amount.mul(totalShares).div(balance()), _shares[msg.sender]);
+        totalShares = totalShares.sub(shares);
+        _shares[msg.sender] = _shares[msg.sender].sub(shares);
+        _cleanupIfDustShares();
+
+        _withdrawTokenWithCorrection(amount);
+        uint depositTimestamp = depositedAt[msg.sender];
+        uint performanceFee = minter.performanceFee(amount);
+        if (performanceFee > DUST) {
+            minter.mintFor(address(CAKE), 0, performanceFee, msg.sender, depositTimestamp, boostRate);
+            amount = amount.sub(performanceFee);
+        }
+
+        CAKE.safeTransfer(msg.sender, amount);
+
+        harvest();
     }
 
      /**

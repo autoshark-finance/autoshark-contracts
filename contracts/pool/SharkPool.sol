@@ -26,8 +26,8 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
 
     /* ========== STATE VARIABLES ========== */
 
-    IBEP20 public rewardsToken; // shark/bnb flip
-    IBEP20 public constant stakingToken = IBEP20(0x33d11961d3dBdE40A8c295Ff0549d244b9ef58b7);   // shark
+    address public override rewardsToken; // shark/bnb flip
+    address public override constant stakingToken = 0xf7321385a461C4490d5526D83E63c366b149cB15;   // shark
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
     uint256 public rewardsDuration = 90 days;
@@ -61,6 +61,10 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
     uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
     // Added SHARK minting boost rate: 150%
     uint16 public boostRate = 15000;
+
+    mapping (address => uint) public override depositedAt;
+    ISharkMinter public override minter;
+    address public override sharkChef = 0x115BebB4CE6B95340aa84ba967193F1aF03ebC73;
     
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);
 
@@ -72,12 +76,12 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
         _stakePermission[msg.sender] = true;
         _stakePermission[presaleContract] = true;
 
-        stakingToken.safeApprove(address(ROUTER), uint(~0));
+        IBEP20(stakingToken).safeApprove(address(ROUTER), uint(~0));
     }
 
     /* ========== VIEWS ========== */
 
-    function totalSupply() external view returns (uint256) {
+    function totalSupply() override external view returns (uint256) {
         return _totalSupply;
     }
 
@@ -97,6 +101,10 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
         return _balances[account];
     }
 
+    function priceShare() override external view returns (uint256) {
+        revert("No implementation");
+    }
+
     function withdrawableBalanceOf(address account) override public view returns (uint) {
         if (block.timestamp > timestamp90DaysAfterPresaleEnds) {
             // unlock all presale shark after 90 days of presale
@@ -105,7 +113,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
             return _balances[account].sub(_presaleBalance[account]);
         } else {
             uint soldInPresale = IPresale(presaleContract).totalBalance().div(2).mul(3); // mint 150% of presale for making flip token
-            uint sharkSupply = stakingToken.totalSupply().sub(stakingToken.balanceOf(deadAddress));
+            uint sharkSupply = IBEP20(stakingToken).totalSupply().sub(IBEP20(stakingToken).balanceOf(deadAddress));
             if (soldInPresale >= sharkSupply) {
                 return _balances[account].sub(_presaleBalance[account]);
             }
@@ -161,7 +169,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
         );
     }
 
-    function earned(address account) public view returns (uint256) {
+    function earned(address account) public override view returns (uint256) {
         return _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
     }
 
@@ -174,7 +182,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
         require(amount > 0, "amount");
         _totalSupply = _totalSupply.add(amount);
         _balances[_to] = _balances[_to].add(amount);
-        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+        IBEP20(stakingToken).safeTransferFrom(msg.sender, address(this), amount);
         
         if (amount > 0 && address(sharkReferral) != address(0) && _referrer != address(0) && _referrer != msg.sender) {
             sharkReferral.recordReferral(msg.sender, _referrer);
@@ -188,7 +196,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
     }
     
     function depositAll(address referrer) override external {
-        deposit(stakingToken.balanceOf(msg.sender), referrer);
+        deposit(IBEP20(stakingToken).balanceOf(msg.sender), referrer);
     }
 
     function withdraw(uint256 amount) override public nonReentrant updateReward(msg.sender) {
@@ -196,7 +204,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
         require(amount <= withdrawableBalanceOf(msg.sender), "locked");
         _totalSupply = _totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
-        stakingToken.safeTransfer(msg.sender, amount);
+        IBEP20(stakingToken).safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
 
@@ -263,7 +271,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
     function setRewardsToken(address _rewardsToken) external onlyOwner {
         require(address(rewardsToken) == address(0), "set rewards token already");
 
-        rewardsToken = IBEP20(_rewardsToken);
+        rewardsToken = _rewardsToken;
         IBEP20(_rewardsToken).safeApprove(address(ROUTER), uint(~0));
     }
 
@@ -301,7 +309,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
         // This keeps the reward rate in the right range, preventing overflows due to
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-        uint _balance = rewardsToken.balanceOf(address(this));
+        uint _balance = IBEP20(rewardsToken).balanceOf(address(this));
         require(rewardRate <= _balance.div(rewardsDuration), "reward");
 
         lastUpdateTime = block.timestamp;
