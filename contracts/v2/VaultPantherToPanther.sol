@@ -5,14 +5,14 @@ pragma experimental ABIEncoderV2;
 import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/SafeBEP20.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
-import "./interfaces/IStrategy.sol";
+import "./interfaces/IStrategyV2.sol";
 import "../strategy/interfaces/IMasterChef.sol";
 import "../strategy/shark/interfaces/ISharkMinterV2.sol";
 import "./VaultController.sol";
 import {PoolConstant} from "../library/PoolConstant.sol";
 
 
-contract VaultPantherToPanther is VaultController, IStrategy {
+contract VaultPantherToPanther is VaultController, IStrategyV2 {
     using SafeBEP20 for IBEP20;
     using SafeMath for uint;
 

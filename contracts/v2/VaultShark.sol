@@ -8,14 +8,14 @@ import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/SafeBEP20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-import "./interfaces/IStrategy.sol";
+import "./interfaces/IStrategyV2.sol";
 import "../strategy/shark/ISharkMinter.sol";
 import "../strategy/shark/interfaces/ISharkChef.sol";
 import "./VaultController.sol";
 import {PoolConstant} from "../library/PoolConstant.sol";
 
 
-contract VaultShark is VaultController, IStrategy, ReentrancyGuardUpgradeable {
+contract VaultShark is VaultController, IStrategyV2, ReentrancyGuardUpgradeable {
     using SafeMath for uint;
     using SafeBEP20 for IBEP20;
 

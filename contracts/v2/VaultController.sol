@@ -7,7 +7,7 @@ import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/BEP20.sol";
 
 import "../interfaces/IPancakeRouter02.sol";
 import "../interfaces/IPancakePair.sol";
-import "./interfaces/IStrategy.sol";
+import "./interfaces/IStrategyV2.sol";
 import "../strategy/interfaces/IMasterChef.sol";
 import "../strategy/shark/interfaces/ISharkMinterV2.sol";
 import "../strategy/shark/interfaces/ISharkChef.sol";

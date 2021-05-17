@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/proxy/Initializable.sol";
 
-// import "@nomiclabs/buidler/console.sol";
+
 
 // 4 numbers
 contract Lottery is LotteryOwnable, Initializable {
@@ -131,14 +131,14 @@ contract Lottery is LotteryOwnable, Initializable {
         for (uint i = 0; i < 10; i++) {
             getTotalRewards(issueIndex);
         }
-        uint256 gasleft = gasleft();
+        uint256 _gasleft = gasleft();
 
         // 1
         _structHash = keccak256(
             abi.encode(
                 _blockhash,
                 totalAddresses,
-                gasleft,
+                _gasleft,
                 _externalRandomNumber
             )
         );
@@ -151,7 +151,7 @@ contract Lottery is LotteryOwnable, Initializable {
             abi.encode(
                 _blockhash,
                 totalAmount,
-                gasleft,
+                _gasleft,
                 _externalRandomNumber
             )
         );
@@ -164,7 +164,7 @@ contract Lottery is LotteryOwnable, Initializable {
             abi.encode(
                 _blockhash,
                 lastTimestamp,
-                gasleft,
+                _gasleft,
                 _externalRandomNumber
             )
         );
@@ -176,7 +176,7 @@ contract Lottery is LotteryOwnable, Initializable {
         _structHash = keccak256(
             abi.encode(
                 _blockhash,
-                gasleft,
+                _gasleft,
                 _externalRandomNumber
             )
         );

@@ -42,7 +42,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     uint16 public referralCommissionRate = 1000;
     // Max referral commission rate: 10%.
     uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
-    // Added SHARK minting boost rate: 150%
+    // Added SHARK minting boost rate: 500%
     uint16 public boostRate = 50000;
     
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);

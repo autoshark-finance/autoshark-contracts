@@ -4,11 +4,12 @@ pragma solidity ^0.6.12;
 import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/BEP20.sol";
 import "@pancakeswap/pancake-swap-lib/contracts/token/BEP20/SafeBEP20.sol";
 import "@pancakeswap/pancake-swap-lib/contracts/math/SafeMath.sol";
+import '@pantherswap-libs/panther-swap-core/contracts/interfaces/IPantherPair.sol';
 
 import "./interfaces/ISharkMinterV2.sol";
 import "../../interfaces/IStakingRewards.sol";
-import "../dashboard/calculator/PriceCalculatorBSC.sol";
-import "../zap/ZapBSC.sol";
+import "../../v2/PriceCalculatorBSC.sol";
+import "../../zap/ZapPanther.sol";
 
 contract SharkMinterV2 is ISharkMinterV2, OwnableUpgradeable {
     using SafeMath for uint;
@@ -27,7 +28,7 @@ contract SharkMinterV2 is ISharkMinterV2, OwnableUpgradeable {
 
     uint public constant FEE_MAX = 10000;
 
-    ZapBSC public constant zapBSC = ZapBSC(0xCBEC8e7AB969F6Eb873Df63d04b4eAFC353574b1);
+    ZapPanther public constant zapBSC = ZapPanther(0xCBEC8e7AB969F6Eb873Df63d04b4eAFC353574b1);
     PriceCalculatorBSC public constant priceCalculator = PriceCalculatorBSC(0x542c06a5dc3f27e0fbDc9FB7BC6748f26d54dDb0);
 
     /* ========== STATE VARIABLES ========== */
@@ -214,10 +215,10 @@ contract SharkMinterV2 is ISharkMinterV2, OwnableUpgradeable {
         if (asset == address(0)) {
             zapBSC.zapIn{value : address(this).balance}(SHARK_BNB);
         }
-        else if (keccak256(abi.encodePacked(IPancakePair(asset).symbol())) == keccak256("Panther-LP")) {
+        else if (keccak256(abi.encodePacked(IPantherPair(asset).symbol())) == keccak256("Panther-LP")) {
             zapBSC.zapOut(asset, IBEP20(asset).balanceOf(address(this)));
 
-            IPancakePair pair = IPancakePair(asset);
+            IPantherPair pair = IPantherPair(asset);
             address token0 = pair.token0();
             address token1 = pair.token1();
             if (token0 == WBNB || token1 == WBNB) {

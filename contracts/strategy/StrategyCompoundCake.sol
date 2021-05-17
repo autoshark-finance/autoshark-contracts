@@ -27,10 +27,11 @@ contract StrategyCompoundCake is IStrategy, Ownable {
     uint public totalShares;
     mapping (address => uint) private _shares;
     mapping (address => uint) private _principal;
-    mapping (address => uint) public depositedAt;
+    mapping (address => uint) public override depositedAt;
 
-    ISharkMinter public minter;
+    ISharkMinter public override minter;
     IStrategyHelper public helper = IStrategyHelper(0x3027a3A0977db985e812D2D4FDd0a17aF17C8ef4); // CAKE strategy
+    address public override sharkChef = 0x115BebB4CE6B95340aa84ba967193F1aF03ebC73;
     
     // Shark referral contract address
     ISharkReferral public sharkReferral;
@@ -80,6 +81,14 @@ contract StrategyCompoundCake is IStrategy, Ownable {
         return totalShares;
     }
 
+    function stakingToken() external view override returns (address) {
+        return 0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7;
+    }
+
+    function rewardsToken() external view override returns (address) {
+        return 0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7;
+    }
+
     function balance() override public view returns (uint) {
         (uint amount,) = CAKE_MASTER_CHEF.userInfo(poolId, address(this));
         return CAKE.balanceOf(address(this)).add(amount);
@@ -102,7 +111,7 @@ contract StrategyCompoundCake is IStrategy, Ownable {
         return _principal[account];
     }
 
-    function earned(address account) public view returns (uint) {
+    function earned(address account) public override view returns (uint) {
         if (balanceOf(account) >= principalOf(account) + DUST) {
             return balanceOf(account).sub(principalOf(account));
         } else {
@@ -155,7 +164,7 @@ contract StrategyCompoundCake is IStrategy, Ownable {
         return userInfo;
     }
 
-    function priceShare() public view returns(uint) {
+    function priceShare() public override view returns(uint) {
         return balance().mul(1e18).div(totalShares);
     }
 
