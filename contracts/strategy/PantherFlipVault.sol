@@ -58,6 +58,7 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
     // Added SHARK minting boost rate: 500%
     uint16 public boostRate = 50000;
 
+    event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -97,15 +98,15 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
         return _balances[account];
     }
 
-    // return cakeAmount, sharkAmount, 0
+    // return pantherAmount, sharkAmount, 0
     function profitOf(address account) override public view returns (uint _usd, uint _shark, uint _bnb) {
-        uint cakeVaultPrice = IPantherVault(rewardsToken).priceShare();
+        uint pantherVaultPrice = IPantherVault(rewardsToken).priceShare();
         uint _earned = earned(account);
-        uint amount = _earned.mul(cakeVaultPrice).div(1e18);
+        uint amount = _earned.mul(pantherVaultPrice).div(1e18);
 
         if (address(minter) != address(0) && minter.isMinter(address(this))) {
             uint performanceFee = minter.performanceFee(amount);
-            // cake amount
+            // panther amount
             _usd = amount.sub(performanceFee);
 
             uint bnbValue = helper.tvlInBNB(PANTHER, performanceFee);
@@ -142,17 +143,17 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
     function apy() override public view returns(uint _usd, uint _shark, uint _bnb) {
         uint dailyAPY = helper.compoundingAPY(poolId, 365 days).div(365);
 
-        uint cakeAPY = helper.compoundingAPY(0, 1 days);
-        uint cakeDailyAPY = helper.compoundingAPY(0, 365 days).div(365);
+        uint pantherAPY = helper.compoundingAPY(0, 1 days);
+        uint pantherDailyAPY = helper.compoundingAPY(0, 365 days).div(365);
 
         // let x = 0.5% (daily flip apr)
-        // let y = 0.87% (daily cake apr)
+        // let y = 0.87% (daily panther apr)
         // sum of yield of the year = x*(1+y)^365 + x*(1+y)^364 + x*(1+y)^363 + ... + x
         // ref: https://en.wikipedia.org/wiki/Geometric_series
         // = x * (1-(1+y)^365) / (1-(1+y))
         // = x * ((1+y)^365 - 1) / (y)
 
-        _usd = dailyAPY.mul(cakeAPY).div(cakeDailyAPY);
+        _usd = dailyAPY.mul(pantherAPY).div(pantherDailyAPY);
         _shark = 0;
         _bnb = 0;
     }
@@ -216,7 +217,8 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
             uint withdrawalFee = minter.withdrawalFee(amount, _depositedAt);
             if (withdrawalFee > 0) {
                 uint performanceFee = withdrawalFee.div(100);
-                minter.mintFor(address(stakingToken), withdrawalFee.sub(performanceFee), performanceFee, msg.sender, _depositedAt, boostRate);
+                uint mintedShark = minter.mintFor(address(stakingToken), withdrawalFee.sub(performanceFee), performanceFee, msg.sender, _depositedAt, boostRate);
+                payReferralCommission(msg.sender, mintedShark);
                 amount = amount.sub(withdrawalFee);
             }
         }
@@ -240,16 +242,17 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
         if (reward > 0) {
             rewards[msg.sender] = 0;
             IPantherVault(rewardsToken).withdraw(reward);
-            uint cakeBalance = IBEP20(PANTHER).balanceOf(address(this));
+            uint pantherBalance = IBEP20(PANTHER).balanceOf(address(this));
 
             if (address(minter) != address(0) && minter.isMinter(address(this))) {
-                uint performanceFee = minter.performanceFee(cakeBalance);
-                minter.mintFor(PANTHER, 0, performanceFee, msg.sender, depositedAt[msg.sender], boostRate);
-                cakeBalance = cakeBalance.sub(performanceFee);
+                uint performanceFee = minter.performanceFee(pantherBalance);
+                uint mintedShark = minter.mintFor(PANTHER, 0, performanceFee, msg.sender, depositedAt[msg.sender], boostRate);
+                payReferralCommission(msg.sender, mintedShark);
+                pantherBalance = pantherBalance.sub(performanceFee);
             }
 
-            IBEP20(PANTHER).safeTransfer(msg.sender, cakeBalance);
-            emit RewardPaid(msg.sender, cakeBalance);
+            IBEP20(PANTHER).safeTransfer(msg.sender, pantherBalance);
+            emit RewardPaid(msg.sender, pantherBalance);
         }
     }
 
@@ -259,9 +262,9 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
     }
 
     function _harvest() private {
-        uint cakeAmount = IBEP20(PANTHER).balanceOf(address(this));
+        uint pantherAmount = IBEP20(PANTHER).balanceOf(address(this));
         uint _before = IPantherVault(rewardsToken).sharesOf(address(this));
-        IPantherVault(rewardsToken).deposit(cakeAmount);
+        IPantherVault(rewardsToken).deposit(pantherAmount);
         uint amount = IPantherVault(rewardsToken).sharesOf(address(this)).sub(_before);
         if (amount > 0) {
             _notifyRewardAmount(amount);
@@ -379,6 +382,39 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
         }
         _;
+    }
+
+    /**
+     * Referral code
+     */
+    
+    // Update the shark referral contract address by the owner
+    function setSharkReferral(ISharkReferral _sharkReferral) public onlyOwner {
+        sharkReferral = _sharkReferral;
+    }
+
+    // Update referral commission rate by the owner
+    function setReferralCommissionRate(uint16 _referralCommissionRate) public onlyOwner {
+        require(_referralCommissionRate <= MAXIMUM_REFERRAL_COMMISSION_RATE, "setReferralCommissionRate: invalid referral commission rate basis points");
+        referralCommissionRate = _referralCommissionRate;
+    }
+
+    // Pay referral commission to the referrer who referred this user, based on profit
+    function payReferralCommission(address _user, uint256 _pending) internal {
+        if (address(sharkReferral) != address(0) && referralCommissionRate > 0) {
+            address referrer = sharkReferral.getReferrer(_user);
+            uint256 commissionAmount = _pending.mul(referralCommissionRate).div(10000);
+
+            if (referrer != address(0) && commissionAmount > 0) {
+                minter.mint(commissionAmount, _user);
+                minter.mint(commissionAmount, referrer);
+                
+                sharkReferral.recordReferralCommission(referrer, commissionAmount);
+                sharkReferral.recordReferralCommission(_user, commissionAmount);
+                emit ReferralCommissionPaid(_user, referrer, commissionAmount);
+                emit ReferralCommissionPaid(referrer, _user, commissionAmount);
+            }
+        }
     }
 
     /* ========== EVENTS ========== */
