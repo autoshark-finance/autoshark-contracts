@@ -16,8 +16,8 @@ import "./interfaces/IStrategyHelper.sol";
 // There are only calculations for apy, tvl, etc.
 contract StrategyHelperV1 is IStrategyHelper {
     using SafeMath for uint;
-    address private constant PANTHER_POOL = 0xecc11a78490866e0073EbC4a4dCb6F75673C8685; // Panther Pool PANTHER_WBNB
-    address private constant BNB_BUSD_POOL = 0x1B96B92314C44b159149f7E0303511fB2Fc4774f;
+    address private constant PANTHER_POOL = 0xC24AD5197DaeFD97DF28C70AcbDF17d9fF92a49B; // Panther Pool PANTHER_WBNB
+    address private constant BNB_BUSD_POOL = 0x6AF4C4433474B2F8BA385AD62B23299c82846783;
 
     IBEP20 private constant WBNB = IBEP20(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
     IBEP20 private constant PANTHER = IBEP20(0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7); // Panther

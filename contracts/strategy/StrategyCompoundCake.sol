@@ -30,7 +30,7 @@ contract StrategyCompoundCake is IStrategy, Ownable {
     mapping (address => uint) public override depositedAt;
 
     ISharkMinter public override minter;
-    IStrategyHelper public helper = IStrategyHelper(0x3027a3A0977db985e812D2D4FDd0a17aF17C8ef4); // CAKE strategy
+    IStrategyHelper public helper = IStrategyHelper(0xBd17385A935C8D77d15DB2E2C0e1BDE82fdFCe44); // CAKE strategy
     address public override sharkChef = 0x115BebB4CE6B95340aa84ba967193F1aF03ebC73;
     
     // Shark referral contract address

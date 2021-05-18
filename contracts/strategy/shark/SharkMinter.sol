@@ -29,7 +29,7 @@ contract SharkMinter is ISharkMinter, Ownable, PantherSwap {
     uint public sharkPerSharkBNBFlip;
 
     address public constant sharkPool = 0x5F7de53f6dF023d1c64046e9C4A2b8a1a0EC95C6;
-    IStrategyHelper public helper = IStrategyHelper(0xd9bAfd0024d931D103289721De0D43077e7c2B49);
+    IStrategyHelper public helper = IStrategyHelper(0xBd17385A935C8D77d15DB2E2C0e1BDE82fdFCe44);
 
     mapping (address => bool) private _minters;
 

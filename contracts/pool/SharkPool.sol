@@ -50,7 +50,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
     uint private constant timestamp90DaysAfterPresaleEnds = 1605585600 + (90 days);
 
     /* ========== SHARK HELPER ========= */
-    IStrategyHelper public helper = IStrategyHelper(0xd9bAfd0024d931D103289721De0D43077e7c2B49);
+    IStrategyHelper public helper = IStrategyHelper(0xBd17385A935C8D77d15DB2E2C0e1BDE82fdFCe44);
     IPantherRouter02 private constant ROUTER = IPantherRouter02(0x24f7C33ae5f77e2A9ECeed7EA858B4ca2fa1B7eC);
     
     // Shark referral contract address

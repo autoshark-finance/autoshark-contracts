@@ -33,7 +33,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     mapping (address => uint) public override depositedAt;
 
     ISharkMinter public override minter;
-    IStrategyHelper public helper = IStrategyHelper(0xd9bAfd0024d931D103289721De0D43077e7c2B49);
+    IStrategyHelper public helper = IStrategyHelper(0xBd17385A935C8D77d15DB2E2C0e1BDE82fdFCe44);
     address public override sharkChef = 0x115BebB4CE6B95340aa84ba967193F1aF03ebC73;
     
     // Shark referral contract address
@@ -304,8 +304,11 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
             payReferralCommission(msg.sender, mintedShark);
             amount = amount.sub(performanceFee);
         }
-
-        PANTHER.safeTransfer(msg.sender, amount);
+        
+        // Account for PANTHER tax when we retrieve from POOL
+        // Send resultant amount to user
+        uint firstTax = amount.mul(PANTHER.transferTaxRate()).div(10000);
+        PANTHER.safeTransfer(msg.sender, amount.sub(firstTax));
 
         harvest();
     }
