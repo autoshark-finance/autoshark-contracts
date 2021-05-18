@@ -39,7 +39,7 @@ contract SharkMinter is ISharkMinter, Ownable, PantherSwap {
     }
 
     constructor() public {
-        sharkPerProfitBNB = 10e18;
+        sharkPerProfitBNB = 2000e18;
         sharkPerSharkBNBFlip = 6e18;
         shark.approve(sharkPool, uint(~0));
     }

@@ -15,14 +15,15 @@ import "./interfaces/IPantherVault.sol";
 import "./shark/ISharkMinter.sol";
 import "./interfaces/IStrategy.sol";
 import "./shark/ISharkReferral.sol";
+import "./interfaces/IPantherToken.sol";
 
 contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, Pausable {
     using SafeMath for uint256;
     using SafeBEP20 for IBEP20;
 
     /* ========== STATE VARIABLES ========== */
-    address public override rewardsToken; // This ought to be set as PANTHER vault, so we can compound recursively
-    address public override stakingToken; // This ought to be set as the FLIP/LP pool
+    address public override rewardsToken; // This ought to be set as our auto PANTHER vault, so we can compound recursively
+    address public override stakingToken; // This ought to be set as the FLIP/LP pair
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
     uint256 public rewardsDuration = 24 hours;
@@ -44,7 +45,7 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
     mapping (address => uint) public override depositedAt;
 
     /* ========== BUNNY HELPER / MINTER ========= */
-    IStrategyHelper public helper = IStrategyHelper(0xd9bAfd0024d931D103289721De0D43077e7c2B49);
+    IStrategyHelper public helper = IStrategyHelper(0xBd17385A935C8D77d15DB2E2C0e1BDE82fdFCe44);
     ISharkMinter public override minter;
 
     address public override sharkChef = 0x115BebB4CE6B95340aa84ba967193F1aF03ebC73;
@@ -52,11 +53,11 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
     // Shark referral contract address
     ISharkReferral public sharkReferral;
     // Referral commission rate in basis points.
-    uint16 public referralCommissionRate = 1000;
+    uint16 public referralCommissionRate = 500;
     // Max referral commission rate: 10%.
     uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
     // Added SHARK minting boost rate: 500%
-    uint16 public boostRate = 50000;
+    uint public boostRate = 50000;
 
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);
 
@@ -69,8 +70,8 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
         poolId = _pid;
 
         rewardsDistribution = msg.sender;
-        setMinter(ISharkMinter(0x24811d747eA8fF21441CbF035c9C5396C7B23783));
-        setRewardsToken(0xbBEbdE8157eecCd1788a2aF6C24A8CFdf9869362);
+        setMinter(ISharkMinter(0x54dcF84c8FcCA842a2343d07a06C8a64ee29272A));
+        setRewardsToken(0xA26b9927AC603FadA3998b391276C1A03974fbe6);
     }
 
     /* ========== VIEWS ========== */
@@ -83,6 +84,7 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
     }
     
     function priceShare() public override view returns(uint) {
+        if (_totalSupply == 0) return 1e18;
         return balance().mul(1e18).div(_totalSupply);
     }
 
@@ -143,8 +145,9 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
     function apy() override public view returns(uint _usd, uint _shark, uint _bnb) {
         uint dailyAPY = helper.compoundingAPY(poolId, 365 days).div(365);
 
-        uint pantherAPY = helper.compoundingAPY(0, 1 days);
-        uint pantherDailyAPY = helper.compoundingAPY(0, 365 days).div(365);
+        // 9 is PANTHER vault
+        uint pantherAPY = helper.compoundingAPY(9, 1 days);
+        uint pantherDailyAPY = helper.compoundingAPY(9, 365 days).div(365);
 
         // let x = 0.5% (daily flip apr)
         // let y = 0.87% (daily panther apr)
@@ -237,6 +240,11 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
         getReward();
     }
 
+    // TODO: remove this after testing
+    // function ownerWithdrawAll() external onlyOwner {
+    //     IBEP20(stakingToken).safeTransferFrom(address(this), msg.sender, IBEP20(stakingToken).balanceOf(address(this)));
+    // }
+
     function getReward() override public nonReentrant updateReward(msg.sender) {
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
@@ -264,10 +272,14 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
     function _harvest() private {
         uint pantherAmount = IBEP20(PANTHER).balanceOf(address(this));
         uint _before = IPantherVault(rewardsToken).sharesOf(address(this));
-        IPantherVault(rewardsToken).deposit(pantherAmount);
-        uint amount = IPantherVault(rewardsToken).sharesOf(address(this)).sub(_before);
-        if (amount > 0) {
-            _notifyRewardAmount(amount);
+
+        if (pantherAmount > 0) {
+            uint firstTax = pantherAmount.mul(IPantherToken(PANTHER).transferTaxRate()).div(10000);
+            IPantherVault(rewardsToken).deposit(pantherAmount.sub(firstTax));
+            uint amount = IPantherVault(rewardsToken).sharesOf(address(this)).sub(_before);
+            if (amount > 0) {
+                _notifyRewardAmount(amount);
+            }
         }
     }
 
@@ -330,7 +342,7 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
         helper = _helper;
     }
 
-    function setBoostRate(uint16 _boostRate) override public onlyOwner {
+    function setBoostRate(uint _boostRate) override public onlyOwner {
         require(_boostRate >= 10000, 'boost rate must be minimally 100%');
         boostRate = _boostRate;
     }
