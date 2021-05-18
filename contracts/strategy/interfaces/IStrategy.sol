@@ -62,5 +62,5 @@ interface IStrategy {
     function rewardsToken() external view returns (address);
 
 
-    function setBoostRate(uint16 _boostRate) external;
+    function setBoostRate(uint _boostRate) external;
 }

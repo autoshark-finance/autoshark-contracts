@@ -39,18 +39,18 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     // Shark referral contract address
     ISharkReferral public sharkReferral;
     // Referral commission rate in basis points.
-    uint16 public referralCommissionRate = 1000;
+    uint16 public referralCommissionRate = 500;
     // Max referral commission rate: 10%.
     uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
     // Added SHARK minting boost rate: 500%
-    uint16 public boostRate = 50000;
+    uint public boostRate = 100000;
     
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);
 
     constructor() public {
         PANTHER.safeApprove(address(PANTHER_MASTER_CHEF), uint(~0));
 
-        setMinter(ISharkMinter(0x573709F3e05D8D45666241d3B9Ca2fb5104f0e4b));
+        setMinter(ISharkMinter(0x24811d747eA8fF21441CbF035c9C5396C7B23783));
     }
 
     function setKeeper(address _keeper) external {
@@ -79,7 +79,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
         helper = _helper;
     }
     
-    function setBoostRate(uint16 _boostRate) override public onlyOwner {
+    function setBoostRate(uint _boostRate) override public onlyOwner {
         require(_boostRate >= 10000, 'boost rate must be minimally 100%');
         boostRate = _boostRate;
     }
@@ -229,25 +229,24 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
 
         uint principal = _principal[msg.sender];
         uint depositTimestamp = depositedAt[msg.sender];
-        uint firstTax = _withdraw.mul(PANTHER.transferTaxRate()).div(10000);
-        uint secondTax = _withdraw.sub(firstTax).mul(PANTHER.transferTaxRate()).div(10000);
-        uint transferTax = firstTax.add(secondTax);
-        uint withdrawAfterTax = _withdraw.sub(transferTax);
 
         delete _principal[msg.sender];
         delete depositedAt[msg.sender];
 
-        if (address(minter) != address(0) && minter.isMinter(address(this)) && withdrawAfterTax > principal) {
-            uint profit = withdrawAfterTax.sub(principal);
-            uint withdrawalFee = minter.withdrawalFee(withdrawAfterTax, depositTimestamp);
+        if (address(minter) != address(0) && minter.isMinter(address(this)) && _withdraw > principal) {
+            uint profit = _withdraw.sub(principal);
+            uint withdrawalFee = minter.withdrawalFee(_withdraw, depositTimestamp);
             uint performanceFee = minter.performanceFee(profit);
 
             uint mintedShark = minter.mintFor(address(PANTHER), withdrawalFee, performanceFee, msg.sender, depositTimestamp, boostRate);
             payReferralCommission(msg.sender, mintedShark);
-
-            PANTHER.safeTransfer(msg.sender, withdrawAfterTax.sub(withdrawalFee).sub(performanceFee));
+            
+            uint taxableAmount = _withdraw.sub(withdrawalFee).sub(performanceFee);
+            uint firstTax = taxableAmount.mul(PANTHER.transferTaxRate()).div(10000);
+            PANTHER.safeTransfer(msg.sender, taxableAmount.sub(firstTax));
         } else {
-            PANTHER.safeTransfer(msg.sender, withdrawAfterTax);
+            uint firstTax = _withdraw.mul(PANTHER.transferTaxRate()).div(10000);
+            PANTHER.safeTransfer(msg.sender, _withdraw.sub(firstTax));
         }
 
         harvest();
