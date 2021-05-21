@@ -9,31 +9,34 @@ import "pantherswap-peripheral/contracts/interfaces/IPantherRouter02.sol";
 import '@pantherswap-libs/panther-swap-core/contracts/interfaces/IPantherPair.sol';
 import '@pantherswap-libs/panther-swap-core/contracts/interfaces/IPantherFactory.sol';
 
+import "../interfaces/IPantherToken.sol";
+
 abstract contract PantherSwap {
     using SafeMath for uint;
     using SafeBEP20 for IBEP20;
 
-    IPantherRouter02 private constant ROUTER = IPantherRouter02(0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F); // TODO: get from PANTHER after AMM
-    IPantherFactory private constant factory = IPantherFactory(0xBCfCcbde45cE874adCB698cC183deBcF17952812); // TODO: get from PANTHER after AMM
+    IPantherRouter02 private constant ROUTER = IPantherRouter02(0x24f7C33ae5f77e2A9ECeed7EA858B4ca2fa1B7eC);
+    IPantherFactory private constant factory = IPantherFactory(0x670f55c6284c629c23baE99F585e3f17E8b9FC31);
 
     address internal constant panther = 0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7; // PANTHER
     address private constant _shark = 0xf7321385a461C4490d5526D83E63c366b149cB15; // SHARK
     address private constant _wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
-    function sharkBNBFlipToken() internal view returns(address) {
+    function sharkBNBFlipToken() public view returns(address) {
         return factory.getPair(_shark, _wbnb);
     }
 
     function tokenToSharkBNB(address token, uint amount) internal returns(uint flipAmount) {
         if (token == panther) {
-            flipAmount = _cakeToSharkBNBFlip(amount);
+            flipAmount = _pantherToSharkBNBFlip(amount);
         } else {
             // flip
             flipAmount = _flipToSharkBNBFlip(token, amount);
         }
     }
 
-    function _cakeToSharkBNBFlip(uint amount) private returns(uint flipAmount) {
+    function _pantherToSharkBNBFlip(uint amount) private returns(uint flipAmount) {
+        // Need to account for taxes
         swapToken(panther, amount.div(2), _shark);
         swapToken(panther, amount.sub(amount.div(2)), _wbnb);
 
@@ -60,7 +63,7 @@ abstract contract PantherSwap {
         }
     }
 
-    function swapToken(address _from, uint _amount, address _to) private {
+    function swapToken(address _from, uint _amount, address _to) internal {
         if (_from == _to) return;
 
         address[] memory path;
@@ -74,13 +77,18 @@ abstract contract PantherSwap {
             path[1] = _wbnb;
             path[2] = _to;
         }
-
-        IBEP20(_from).safeApprove(address(ROUTER), 0);
-        IBEP20(_from).safeApprove(address(ROUTER), _amount);
-        ROUTER.swapExactTokensForTokens(_amount, 0, path, address(this), block.timestamp);
+        if (_from == panther) {
+            IBEP20(_from).safeApprove(address(ROUTER), 0);
+            IBEP20(_from).safeApprove(address(ROUTER), uint(~0));
+            ROUTER.swapExactTokensForTokensSupportingFeeOnTransferTokens(_amount, 0, path, address(this), block.timestamp);
+        } else {
+            IBEP20(_from).safeApprove(address(ROUTER), 0);
+            IBEP20(_from).safeApprove(address(ROUTER), uint(~0));
+            ROUTER.swapExactTokensForTokens(_amount, 0, path, address(this), block.timestamp);
+        }
     }
 
-    function generateFlipToken() private returns(uint liquidity) {
+    function generateFlipToken() internal returns(uint liquidity) {
         uint amountADesired = IBEP20(_shark).balanceOf(address(this));
         uint amountBDesired = IBEP20(_wbnb).balanceOf(address(this));
 

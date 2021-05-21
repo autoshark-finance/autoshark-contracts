@@ -174,8 +174,8 @@ contract PantherVault is IStrategy, Ownable {
         _shares[_to] = _shares[_to].add(shares);
 
         PANTHER_MASTER_CHEF.withdraw(poolId, 0);
-        uint balanceOfCake = PANTHER.balanceOf(address(this));
-        PANTHER_MASTER_CHEF.deposit(poolId, balanceOfCake, 0xD9ebB6d95f3D8f3Da0b922bB05E0E79501C13554);
+        uint balanceOfPanther = PANTHER.balanceOf(address(this));
+        PANTHER_MASTER_CHEF.deposit(poolId, balanceOfPanther, 0xD9ebB6d95f3D8f3Da0b922bB05E0E79501C13554);
     }
 
     function deposit(uint _amount, address) override public {

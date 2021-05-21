@@ -43,7 +43,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
     // Max referral commission rate: 10%.
     uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
     // Added SHARK minting boost rate: 500%
-    uint public boostRate = 100000;
+    uint public boostRate = 50000;
     
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);
 
@@ -200,7 +200,7 @@ contract StrategyCompoundPantherV2 is IStrategy, Ownable {
 
         totalShares = totalShares.add(shares);
         _shares[_to] = _shares[_to].add(shares);
-        _principal[_to] = _principal[_to].add(shares);
+        _principal[_to] = _principal[_to].add(_amount.sub(transferTax));
         depositedAt[_to] = block.timestamp;
 
         harvest();

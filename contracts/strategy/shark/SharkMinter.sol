@@ -18,6 +18,7 @@ contract SharkMinter is ISharkMinter, Ownable, PantherSwap {
     BEP20 private constant shark = BEP20(0xf7321385a461C4490d5526D83E63c366b149cB15); // SHARK
     address public constant dev = 0xD9ebB6d95f3D8f3Da0b922bB05E0E79501C13554;
     IBEP20 private constant WBNB = IBEP20(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
+    IPantherToken private constant PANTHER = IPantherToken(0x1f546aD641B56b86fD9dCEAc473d1C7a357276B7);
 
     uint public override WITHDRAWAL_FEE_FREE_PERIOD = 3 days;
     uint public override WITHDRAWAL_FEE = 50;
@@ -28,7 +29,7 @@ contract SharkMinter is ISharkMinter, Ownable, PantherSwap {
     uint public override sharkPerProfitBNB;
     uint public sharkPerSharkBNBFlip;
 
-    address public constant sharkPool = 0x5F7de53f6dF023d1c64046e9C4A2b8a1a0EC95C6;
+    address public constant sharkPool = 0x88dC3FD53f4b96b101a682170eaa37619DE3be8c;
     IStrategyHelper public helper = IStrategyHelper(0xBd17385A935C8D77d15DB2E2C0e1BDE82fdFCe44);
 
     mapping (address => bool) private _minters;
@@ -115,7 +116,11 @@ contract SharkMinter is ISharkMinter, Ownable, PantherSwap {
 
     function mintFor(address flip, uint _withdrawalFee, uint _performanceFee, address to, uint, uint boostRate) override external onlyMinter returns(uint mintAmount) {
         uint feeSum = _performanceFee.add(_withdrawalFee);
-        IBEP20(flip).safeTransferFrom(msg.sender, address(this), feeSum);
+        uint tax = 0;
+        if (flip == address(PANTHER)) {
+            tax = feeSum.mul(PANTHER.transferTaxRate()).div(10000);
+        }
+        IBEP20(flip).safeTransferFrom(msg.sender, address(this), feeSum.sub(tax));
 
         uint sharkBNBAmount = tokenToSharkBNB(flip, IBEP20(flip).balanceOf(address(this)));
         address flipToken = sharkBNBFlipToken();
@@ -143,6 +148,9 @@ contract SharkMinter is ISharkMinter, Ownable, PantherSwap {
 
         uint sharkForDev = amount.mul(15).div(100);
         shark.mint(sharkForDev);
-        IStakingRewards(sharkPool).stakeTo(sharkForDev, dev);
+        // When minting for commissions, there's a chance that minted amount is 0
+        if (sharkForDev > 0) {
+            IStakingRewards(sharkPool).stakeTo(sharkForDev, dev);
+        }
     }
 }

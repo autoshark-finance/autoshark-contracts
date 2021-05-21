@@ -67,7 +67,8 @@ contract StrategyHelperV1 is IStrategyHelper {
             uint performanceFee = minter.performanceFee(_usd);
             _usd = _usd.sub(performanceFee);
             uint bnbAmount = performanceFee.mul(1e18).div(bnbPriceInUSD());
-            _shark = minter.amountSharkToMint(bnbAmount);
+            // multiply 5 for boost rate
+            _shark = minter.amountSharkToMint(bnbAmount).mul(5);
         }
         _bnb = 0;
     }

@@ -6,14 +6,14 @@ dapp: https://autoshark.finance
 
 #### AutoShark.finance Contracts
 - SharkToken: [0xf7321385a461C4490d5526D83E63c366b149cB15](https://bscscan.com/address/0xf7321385a461C4490d5526D83E63c366b149cB15)
-- SHARK Pool: [0xddDAe83bDac042E4F0570fD07CeFD516AC974155](https://bscscan.com/address/0xddDAe83bDac042E4F0570fD07CeFD516AC974155)
+- SHARK Pool: [0x5F7de53f6dF023d1c64046e9C4A2b8a1a0EC95C6](https://bscscan.com/address/0x5F7de53f6dF023d1c64046e9C4A2b8a1a0EC95C6)
 - SHARK-BNB Pool: [0x1fd789Fa513871Cb89Aa655F11ec777cAD1784a0](https://bscscan.com/address/0x1fd789Fa513871Cb89Aa655F11ec777cAD1784a0) 
 - Zap: [0xA96CeA606D206310e4ffaa65577D316D49043cDF](https://bscscan.com/address/0xA96CeA606D206310e4ffaa65577D316D49043cDF) 
 
 #### Auto Compounding FARM Contracts 
 |     |      Contract Address |
 |-----------|--------------|
-| PANTHER | [0x32C476cD4d72B03077E4D3BdAb15bdC2DA667a24](https://bscscan.com/address/0x32C476cD4d72B03077E4D3BdAb15bdC2DA667a24)|
+| PANTHER | [0x9e7aEbAE4511aB3754b9C25E904D37254d1973D1](https://bscscan.com/address/0x9e7aEbAE4511aB3754b9C25E904D37254d1973D1)|
 
 # Contact Us
 - Twitter: [@autosharkfin](https://twitter.com/autosharkfin)

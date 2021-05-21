@@ -70,8 +70,8 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
         poolId = _pid;
 
         rewardsDistribution = msg.sender;
-        setMinter(ISharkMinter(0x54dcF84c8FcCA842a2343d07a06C8a64ee29272A));
-        setRewardsToken(0xA26b9927AC603FadA3998b391276C1A03974fbe6);
+        setMinter(ISharkMinter(0x917012A52ee3cE352fb242524640Fa6DAdC5F3ED));
+        setRewardsToken(0xC407f86Da1AE340D5E6364cdc3A8A5136E90C2ce);
     }
 
     /* ========== VIEWS ========== */
@@ -254,7 +254,8 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
 
             if (address(minter) != address(0) && minter.isMinter(address(this))) {
                 uint performanceFee = minter.performanceFee(pantherBalance);
-                uint mintedShark = minter.mintFor(PANTHER, 0, performanceFee, msg.sender, depositedAt[msg.sender], boostRate);
+                // Multiplying perf, because we need not account for taxes in this implementation, so we offset it back against our minter
+                uint mintedShark = minter.mintFor(PANTHER, 0, performanceFee.mul(10000).div(9500), msg.sender, depositedAt[msg.sender], boostRate);
                 payReferralCommission(msg.sender, mintedShark);
                 pantherBalance = pantherBalance.sub(performanceFee);
             }
@@ -274,8 +275,7 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
         uint _before = IPantherVault(rewardsToken).sharesOf(address(this));
 
         if (pantherAmount > 0) {
-            uint firstTax = pantherAmount.mul(IPantherToken(PANTHER).transferTaxRate()).div(10000);
-            IPantherVault(rewardsToken).deposit(pantherAmount.sub(firstTax));
+            IPantherVault(rewardsToken).deposit(pantherAmount);
             uint amount = IPantherVault(rewardsToken).sharesOf(address(this)).sub(_before);
             if (amount > 0) {
                 _notifyRewardAmount(amount);

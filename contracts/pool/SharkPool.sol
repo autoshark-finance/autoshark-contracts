@@ -60,7 +60,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
     // Max referral commission rate: 10%.
     uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
     // Added SHARK minting boost rate: 150%
-    uint16 public boostRate = 15000;
+    uint public boostRate = 15000;
 
     mapping (address => uint) public override depositedAt;
     ISharkMinter public override minter;
@@ -280,7 +280,7 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
         helper = _helper;
     }
 
-    function setBoostRate(uint16 _boostRate) override public onlyOwner {
+    function setBoostRate(uint _boostRate) override public onlyOwner {
         require(_boostRate >= 10000, 'boost rate must be minimally 100%');
         boostRate = _boostRate;
     }
@@ -324,7 +324,6 @@ contract SharkPool is IStrategy, RewardsDistributionRecipient, ReentrancyGuard, 
     }
 
     function setRewardsDuration(uint256 _rewardsDuration) external onlyOwner {
-        require(periodFinish == 0 || block.timestamp > periodFinish, "period");
         rewardsDuration = _rewardsDuration;
         emit RewardsDurationUpdated(rewardsDuration);
     }
