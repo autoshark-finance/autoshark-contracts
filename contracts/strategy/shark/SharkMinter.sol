@@ -120,7 +120,7 @@ contract SharkMinter is ISharkMinter, Ownable, PantherSwap {
         if (flip == address(PANTHER)) {
             tax = feeSum.mul(PANTHER.transferTaxRate()).div(10000);
         }
-        IBEP20(flip).safeTransferFrom(msg.sender, address(this), feeSum.sub(tax));
+        IBEP20(flip).safeTransferFrom(msg.sender, address(this), feeSum.sub(tax).sub(1));
 
         uint sharkBNBAmount = tokenToSharkBNB(flip, IBEP20(flip).balanceOf(address(this)));
         address flipToken = sharkBNBFlipToken();

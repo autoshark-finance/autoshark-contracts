@@ -275,7 +275,7 @@ contract PantherFlipVault is IStrategy, RewardsDistributionRecipient, Reentrancy
         uint _before = IPantherVault(rewardsToken).sharesOf(address(this));
 
         if (pantherAmount > 0) {
-            IPantherVault(rewardsToken).deposit(pantherAmount);
+            IPantherVault(rewardsToken).deposit(pantherAmount, 0x0000000000000000000000000000000000000000);
             uint amount = IPantherVault(rewardsToken).sharesOf(address(this)).sub(_before);
             if (amount > 0) {
                 _notifyRewardAmount(amount);

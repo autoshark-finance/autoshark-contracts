@@ -57,7 +57,7 @@ contract StrategyCompoundFLIP is IStrategy, Ownable {
     // Max referral commission rate: 10%.
     uint16 public constant MAXIMUM_REFERRAL_COMMISSION_RATE = 1000;
     // Added SHARK minting boost rate: 500%
-    uint16 public boostRate = 50000;
+    uint public boostRate = 50000;
 
     event ReferralCommissionPaid(address indexed user, address indexed referrer, uint256 commissionAmount);
 
@@ -108,7 +108,7 @@ contract StrategyCompoundFLIP is IStrategy, Ownable {
         helper = _helper;
     }
     
-    function setBoostRate(uint16 _boostRate) override public onlyOwner {
+    function setBoostRate(uint _boostRate) override public onlyOwner {
         require(_boostRate >= 10000, 'boost rate must be minimally 100%');
         boostRate = _boostRate;
     }
